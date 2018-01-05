@@ -3,8 +3,9 @@
    [reagent.core :as r :refer [atom]]
    [re-frame.core :as rf]
    [stand-lib.handlers]
-   [stand-lib.re-frame.utils :refer
-    [extract-ns+name make-keys set-state update-state]]))
+   [stand-lib.utils :refer [extract-ns+name make-keys]]
+   [stand-lib.re-frame.utils :refer [set-state update-state]]))
+
 
 (defn query-sub [db [event ns+name]]
   (get-in db (extract-ns+name ns+name)))
