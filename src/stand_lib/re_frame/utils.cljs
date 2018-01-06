@@ -1,6 +1,7 @@
 (ns stand-lib.re-frame.utils
   (:require
-   [re-frame.core :as rf]))
+   [re-frame.core :as rf]
+   [stand-lib.utils :refer [extract-ns+name]]))
 
 (defn query
   "Meant to be used with a rf/reg-sub. Takes a `db` map and an event-id from

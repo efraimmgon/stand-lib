@@ -1,5 +1,6 @@
 (ns stand-lib.components
   (:require
+   [clojure.string :as string]
    [reagent.core :as r :refer [atom]]
    [re-frame.core :as rf]
    [stand-lib.handlers]
@@ -48,12 +49,6 @@
 
 
 ; Helpers ----------------------------------------------------------------------
-
-(defn set-state [ks val]
-  (rf/dispatch [:set-state ks val]))
-
-(defn update-state [ks f]
-  (rf/dispatch [:update-state ks f]))
 
 (defn set-state-callback [ns+name]
   (let [ks (make-keys ns+name)]

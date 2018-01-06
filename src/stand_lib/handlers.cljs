@@ -9,28 +9,10 @@
 ; ------------------------------------------------------------------------------
 
 (rf/reg-event-fx
- :ajax-error
- (fn [_ [_ response]]
-   (js/console.log response)
-   (rf/dispatch [:set-error (-> response :response :errors)])))
-
-(rf/reg-event-db
- :set-error
- (fn [db [_ error]]
-   (assoc db :error error)))
-
-
-(rf/reg-event-fx
  :dispatch-n
  (fn [_ [_ events]]
    (doseq [evt events]
-     (dispatch evt))
-   nil))
-
-(rf/reg-event-fx
- :navigate
- (fn [_ [_ url]]
-   (navigate! url)
+     (rf/dispatch evt))
    nil))
 
 (rf/reg-event-db
