@@ -4,7 +4,7 @@
    [reagent.core :as r :refer [atom]]
    [re-frame.core :as rf]
    [stand-lib.handlers]
-   [stand-lib.utils :refer [extract-ns+name make-keys]]
+   [stand-lib.utils :refer [make-keys]]
    [stand-lib.re-frame.utils :refer [set-state update-state]]))
 
 ; ------------------------------------------------------------------------------
@@ -23,15 +23,23 @@
 
 ; Helpers ----------------------------------------------------------------------
 
+(defn get-value [comp]
+  (-> comp .-target .-value))
+
 (defn set-state-callback [ns+name]
   (let [ks (make-keys ns+name)]
     (fn [comp]
-      (set-state ks (-> comp .-target .-value (js->clj :keywordize-keys true))))))
+      (set-state ks (-> comp get-value (js->clj :keywordize-keys true))))))
 
 (defn set-state-callback-for-text [ns+name]
   (let [ks (make-keys ns+name)]
     (fn [comp]
-      (set-state ks (-> comp .-target .-value)))))
+      (set-state ks (get-value comp)))))
+
+(defn set-state-callback-with-reader [ns+name]
+  (let [ks (make-keys ns+name)]
+    (fn [comp]
+      (set-state ks (-> comp get-value cljs.reader/read-string)))))
 
 (defn set-state-with-value-callback [ns+name val]
   (let [ks (make-keys ns+name)]
@@ -71,7 +79,7 @@
 
 (defmethod input :number
   [attrs]
-  (let [edited-attrs (update attrs :on-change #(or % (set-state-callback (:name attrs))))]
+  (let [edited-attrs (update attrs :on-change #(or % (set-state-callback-with-reader (:name attrs))))]
     [:input edited-attrs]))
 
 ; By default the checkbox state is designed to be stored in a single set.
