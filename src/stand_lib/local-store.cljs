@@ -50,12 +50,12 @@
   The first is the localStorage key, the second the id key that will be auto-
   matically incremented, and the last is the key-values being created."
   [{:keys [into id keyvals]}]
-  (let [colls (load into)]
-    (-> (conj colls
-                (assoc keyvals
-                       id (allocate-next-id colls id)))
-        (as-> colls
-              (save! into colls)))))
+  (let [colls (load into)
+        keyvals+id (assoc keyvals
+                          id (allocate-next-id colls id))]
+    (save! into
+           (conj colls keyvals+id))
+    keyvals+id))
 
 (defn update!
   "Takes a localStorage key and a map with keys `where` and `set`.
