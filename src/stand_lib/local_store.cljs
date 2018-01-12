@@ -54,7 +54,7 @@
         keyvals+id (assoc keyvals
                           id (allocate-next-id colls id))]
     (save! into
-           (conj colls keyvals+id))
+           ((fnil conj []) colls keyvals+id))
     keyvals+id))
 
 (defn update!
