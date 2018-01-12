@@ -93,7 +93,7 @@
     (coll? from) (filter where from)
     ;; if `from` is the ls-key we load it
     ;; if where is not given we return everything
-    (and (string? from) (not where))
+    (nil? where)
     (load from)
     ;; otherwise we filter it
     :else (->> (load from)
