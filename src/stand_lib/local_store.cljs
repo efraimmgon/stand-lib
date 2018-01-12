@@ -24,7 +24,7 @@
   "Puts colls into localStorage as EDN"
   [ls-key colls]
   (.setItem js/localStorage ls-key
-            (str colls))
+            (str (vec colls)))
   colls)
 
 (defn load
