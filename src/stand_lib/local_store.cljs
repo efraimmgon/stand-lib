@@ -43,7 +43,7 @@
   Assumes items are a coll of maps with an `:id` field, ordered by this field
   Returns one more than the current largest id."
   [colls idfield]
-  ((fnil inc 0) (get (first colls) idfield)))
+  ((fnil inc 0) (get (last colls) idfield)))
 
 (defn insert!
   "Takes a map with keys `into` `id` and `keyvals`.
@@ -54,7 +54,9 @@
         keyvals+id (assoc keyvals
                           id (allocate-next-id colls id))]
     (save! into
-           ((fnil conj []) colls keyvals+id))
+           (if (empty? colls)
+             [keyvals+id]
+             (conj colls keyvals+id)))
     keyvals+id))
 
 (defn update!
