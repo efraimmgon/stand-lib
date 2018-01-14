@@ -2,10 +2,13 @@
   (:require
    [re-frame.core :as rf]
    [stand-lib.re-frame.utils :refer [query]]
-   [stand-lib.utils :refer [extract-ns+name]]))
+   [stand-lib.utils :refer [extract-ns+name keyword-or-int make-keys]]))
 
 (defn query-sub [db [event ns+name]]
-  (get-in db (extract-ns+name ns+name)))
+  (get-in db (make-keys ns+name)))
+
+(defn get-value [event]
+  (-> event .-target .-value))
 
 ; ------------------------------------------------------------------------------
 ; Event handlers
@@ -19,19 +22,14 @@
    nil))
 
 (rf/reg-event-db
- :set
- (fn [db [_ ns+name val]]
-   (assoc-in db (extract-ns+name ns+name) val)))
-
-(rf/reg-event-db
  :set-state
- (fn [db [_ ks val]]
-   (assoc-in db ks val)))
+ (fn [db [_ path val]]
+   (assoc-in db (make-keys path) val)))
 
 (rf/reg-event-db
  :update-state
- (fn [db [_ ks f]]
-   (update-in db ks f)))
+ (fn [db [_ path f]]
+   (update-in db (make-keys path) f)))
 
 ; ------------------------------------------------------------------------------
 ; Subs

@@ -3,9 +3,7 @@
    [clojure.string :as string]
    [reagent.core :as r :refer [atom]]
    [re-frame.core :as rf]
-   [stand-lib.handlers]
-   [stand-lib.utils :refer [make-keys]]
-   [stand-lib.re-frame.utils :refer [set-state update-state]]))
+   [stand-lib.handlers]))
 
 ; ------------------------------------------------------------------------------
 ; Debugging
@@ -20,44 +18,6 @@
 ; Forms
 ; ------------------------------------------------------------------------------
 
-
-; Helpers ----------------------------------------------------------------------
-
-(defn get-value [comp]
-  (-> comp .-target .-value))
-
-(defn set-state-callback [ns+name]
-  (let [ks (make-keys ns+name)]
-    (fn [comp]
-      (set-state ks (-> comp get-value (js->clj :keywordize-keys true))))))
-
-(defn set-state-callback-for-text [ns+name]
-  (let [ks (make-keys ns+name)]
-    (fn [comp]
-      (set-state ks (get-value comp)))))
-
-(defn set-state-callback-with-reader [ns+name]
-  (let [ks (make-keys ns+name)]
-    (fn [comp]
-      (set-state ks (-> comp get-value cljs.reader/read-string)))))
-
-(defn set-state-with-value-callback [ns+name val]
-  (let [ks (make-keys ns+name)]
-    (fn [comp]
-      (set-state ks val))))
-
-(defn update-state-callback [ns+name f]
-  (let [ks (make-keys ns+name)]
-    (fn [comp]
-      (update-state ks f))))
-
-(defn get-component-value
-  "Returns a Reagent `reaction`, after querying the app-db for `name`.
-  `name` is a keyword, qualified or not, referring to the value's path
-  in app-db."
-  [name]
-  (rf/subscribe [:query name]))
-
 ; Core -------------------------------------------------------------------------
 
 (defn form-group [label & input]
@@ -67,134 +27,50 @@
     [:div]
     input)])
 
-(defmulti input
-  "Input component for `:type`s -> :checkbox, :radio, :number, and :text"
-  (fn [attrs] (:type attrs)))
+;; TODO: update input components
+(comment
+  (defn form-for
+    [obj {:keys [ns fields]}]
+    [:div
+     (doall
+       (for [attrs fields]
+         (let [edited-attrs
+               (-> attrs
+                   (update :value #(or % (get @obj (:id attrs))))
+                   (assoc :name (keyword ns (:id attrs)))
+                   (dissoc :label :id))]
+           ^{:key (:id attrs)}
+           [form-group
+            (:label attrs)
+            (cond
+              (= :textarea (:type attrs))
+              [textarea (merge (dissoc edited-attrs :type)
+                               (select-keys attrs [:rows :cols]))]
 
-; NOTE: inputs type `:text` and `:email` fall in the default
-(defmethod input :default
-  [attrs]
-  (let [edited-attrs (update attrs :on-change #(or % (set-state-callback-for-text (:name attrs))))]
-    [:input edited-attrs]))
+              (or (= :radio (:type attrs)) (= :checkbox (:type attrs)))
+              (doall
+                (for [[label value checked?] (:values attrs)]
+                  (let [checked-fn (fn []
+                                     (cond
+                                       checked? true
+                                       (= :radio (:type attrs))  (= value (get @obj (:id attrs)))
+                                       :else (contains? (get @obj (:id attrs)) value)))]
+                    ^{:key value}
+                    [:label.form-check-label
+                     [input (assoc edited-attrs
+                                   :class "form-check-input"
+                                   :value value
+                                   :default-checked (checked-fn))]
+                     " " label])))
 
-(defmethod input :number
-  [attrs]
-  (let [edited-attrs (update attrs :on-change #(or % (set-state-callback-with-reader (:name attrs))))]
-    [:input edited-attrs]))
+              (= :date (:type attrs))
+              [input (assoc edited-attrs :value
+                            (when-let [d (get @obj (:id attrs))]
+                              (if (string? d)
+                                d
+                                (-> d .toISOString (.split "T") first))))]
 
-; By default the checkbox state is designed to be stored in a single set.
-; By default we figure out if the checkbox is checked based on its value's
-; presence in that set.
-; To override this behavior one must roll their own :on-change and :checked
-; attributes.
-(defmethod input :checkbox
-  [attrs]
-  (let [acc (get-component-value (:name attrs))
-        f (fn [acc]
-            (let [val (:value attrs)]
-              (cond
-                (nil? acc) #{val}
-                (contains? acc val) (disj acc val)
-                :default (conj acc val))))
-        edited-attrs
-        (-> attrs
-            (update :on-change #(or % (update-state-callback (:name attrs) f))))]
-            ; (update :checked
-            ;         #(or %
-            ;              (when (contains? @acc (:value attrs))
-            ;                true))))]
-    ;; persist value when input is default-checked
-    (when (and (:default-checked edited-attrs)
-               (not (contains? @acc (:value edited-attrs))))
-      ((:on-change edited-attrs)))
-    [:input edited-attrs]))
-
-; The :value attribute is used so we don't need to bother coercing the
-; e.target.value to its original type.
-(defmethod input :radio
-  [attrs]
-  (let [acc (get-component-value (:name attrs))
-        edited-attrs (update attrs :on-change #(or % (set-state-with-value-callback (:name attrs) (:value attrs))))]
-    ;; persist value when input is default-checked
-    (when (and (:default-checked edited-attrs)
-               (not (contains? @acc (:value edited-attrs))))
-      ((:on-change edited-attrs)))
-    [:input edited-attrs]))
-
-(defmethod input :date
-  [attrs]
-  (let [edited-attrs  (update attrs :on-change #(or % (set-state-callback (:name attrs))))]
-    [:input edited-attrs]))
-
-(defmethod input :file
-  [attrs]
-  (let [edited-attrs (update attrs :on-change #(or % (set-state-callback (:name attrs))))]
-    [:input edited-attrs]))
-
-(defn textarea [attrs]
-  (let [edited-attrs (update attrs :on-change #(or % (set-state-callback-for-text (:name attrs))))]
-    [:textarea edited-attrs]))
-
-(defn select [attrs & options]
-  (let [ks (make-keys (:name attrs))
-        ;; get the :value of this first option component
-        default-val (-> options ffirst second :value)
-        edited-attrs
-        (-> attrs
-            (update :on-change #(or % (set-state-callback (:name attrs))))
-            ;; If the select has a default value we must persist it, otherwise
-            ;; we set it to the first option's value.
-            (update :value
-                    #(or (and % (do (set-state ks %)
-                                    %))
-                         (do (set-state ks default-val)
-                             default-val))))]
-    (into
-     [:select edited-attrs]
-     options)))
-
-(defn form-for
-  [obj {:keys [ns fields]}]
-  [:div
-   (doall
-     (for [attrs fields]
-       (let [edited-attrs
-             (-> attrs
-                 (update :value #(or % (get @obj (:id attrs))))
-                 (assoc :name (keyword ns (:id attrs)))
-                 (dissoc :label :id))]
-         ^{:key (:id attrs)}
-         [form-group
-          (:label attrs)
-          (cond
-            (= :textarea (:type attrs))
-            [textarea (merge (dissoc edited-attrs :type)
-                             (select-keys attrs [:rows :cols]))]
-
-            (or (= :radio (:type attrs)) (= :checkbox (:type attrs)))
-            (doall
-              (for [[label value checked?] (:values attrs)]
-                (let [checked-fn (fn []
-                                   (cond
-                                     checked? true
-                                     (= :radio (:type attrs))  (= value (get @obj (:id attrs)))
-                                     :else (contains? (get @obj (:id attrs)) value)))]
-                  ^{:key value}
-                  [:label.form-check-label
-                   [input (assoc edited-attrs
-                                 :class "form-check-input"
-                                 :value value
-                                 :default-checked (checked-fn))]
-                   " " label])))
-
-            (= :date (:type attrs))
-            [input (assoc edited-attrs :value
-                          (when-let [d (get @obj (:id attrs))]
-                            (if (string? d)
-                              d
-                              (-> d .toISOString (.split "T") first))))]
-
-            :else [input edited-attrs])])))])
+              :else [input edited-attrs])])))]))
 
 
 ; ------------------------------------------------------------------------------

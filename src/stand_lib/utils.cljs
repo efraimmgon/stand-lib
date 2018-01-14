@@ -24,7 +24,7 @@
         (apply f maps)))
     maps))
 
-(defn- keyword-or-int [x]
+(defn keyword-or-int [x]
   (if (int? (js/parseInt x))
     (js/parseInt x)
     (keyword x)))
