@@ -7,7 +7,7 @@
 
 (defmulti input :type)
 
-;; Default is of whatever type is given
+;; If a type that is not implemented is given, simply use it
 (defmethod input :default
   [attrs]
   (let [field-value (rf/subscribe [:query (:name attrs)])
