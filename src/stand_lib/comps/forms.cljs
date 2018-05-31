@@ -2,79 +2,75 @@
   (:require
    [re-frame.core :as rf]
    [stand-lib.utils.forms :refer
-    [handle-change-at handle-n-change-at handle-mopt-change-at
-     handle-opt-change-at reset-val-at!]]))
+    [handle-change-at handle-mopt-change-at set-state!]]))
 
 (defmulti input :type)
 
-;; If a type that is not implemented is given, simply use it
+; If a type that is not implemented is given, simply use it.
+; Inputs of type:
+; - `:text`
+; - `:number`
+; refer to it.
 (defmethod input :default
   [attrs]
-  (let [field-value (rf/subscribe [:query (:name attrs)])
+  (let [stored-val (rf/subscribe [:query (:name attrs)])
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (update :value #(or % @field-value)))]
-    [:input edited-attrs]))
-
-(defmethod input :number
-  [attrs]
-  (let [field-value (rf/subscribe [:query (:name attrs)])
-        edited-attrs
-        (-> attrs
-            (assoc :type :text)
-            (update :on-change #(or % (fn [e] (handle-n-change-at (:name attrs) e))))
-            (update :value #(or % @field-value)))]
+            (update :value #(or % @stored-val)))]
     [:input edited-attrs]))
 
 (defmethod input :radio
   [attrs]
-  (let [field-value (rf/subscribe [:query (:name attrs)])
+  (let [stored-val (rf/subscribe [:query (:name attrs)])
+        svalue (str (:value attrs))
         edited-attrs
         (-> attrs
             (assoc :type :radio)
-            (update :on-change #(or % (fn [e] (handle-opt-change-at (:name attrs) e))))
+            (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
             (update :checked #(or % (or (:default-checked attrs)
-                                        (= (:value attrs) @field-value))))
+                                        (= svalue @stored-val))))
             (dissoc :default-checked))]
-    ;; persist value when it's the default
-    (when (and (nil? @field-value) (:checked edited-attrs))
-      (reset-val-at! (:name edited-attrs) (:value edited-attrs)))
+    ;; Persist value when it's the default:
+    (when (and (nil? @stored-val) (:checked edited-attrs))
+      (set-state! (:name edited-attrs) svalue))
     [:input edited-attrs]))
 
 (defmethod input :checkbox
   [attrs]
-  (let [field-value (rf/subscribe [:query (:name attrs)])
+  ;; Initialize the container:
+  (set-state! (:name attrs) #{})
+  (let [container (rf/subscribe [:query (:name attrs)])
+        svalue (str (:value attrs))
         edited-attrs
         (-> attrs
             (assoc :type :checkbox)
             (update :on-change #(or % (fn [e] (handle-mopt-change-at (:name attrs) e))))
             (assoc :checked (or (:default-checked attrs)
-                                (contains? @field-value (:value attrs))
-                                (= (:value attrs) @field-value)))
+                                (contains? @container svalue)))
             (dissoc :default-checked))]
-    ;; persist value when it's the default
+    ;; Persist value when it's the default:
     (when (and (:checked edited-attrs)
-               (not (contains? @field-value (:value attrs))))
-      (rf/dispatch [:update-state (:name attrs) #(conj % (:value attrs))]))
+               (not (contains? @container svalue)))
+      (rf/dispatch [:update-state (:name attrs) #(conj % svalue)]))
     [:input edited-attrs]))
 
 (defn textarea [attrs]
-  (let [field-value (rf/subscribe [:query (:name attrs)])
+  (let [stored-val (rf/subscribe [:query (:name attrs)])
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (update :value #(or % @field-value)))]
+            (update :value #(or % @stored-val)))]
     [:textarea edited-attrs]))
 
 (defn select [attrs options]
-  (let [field-value (rf/subscribe [:query (:name attrs)])
+  (let [stored-val (rf/subscribe [:query (:name attrs)])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (handle-opt-change-at (:name attrs) e))))
-            (update :value #(or % (or @field-value (:default-value attrs))))
+            (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
+            (update :value #(or % (or @stored-val (:default-value attrs))))
             (dissoc :default-value))]
-    (when (and (nil? @field-value) (:default-value attrs))
-      (reset-val-at! (:name attrs) (:default-value attrs)))
+    (when (and (nil? @stored-val) (:default-value attrs))
+      (set-state! (:name attrs) (:default-value attrs)))
     [:select edited-attrs
      options]))

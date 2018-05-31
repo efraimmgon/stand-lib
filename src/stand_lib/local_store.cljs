@@ -1,5 +1,6 @@
 (ns stand-lib.local-store
   (:require
+   [cljs.reader]
    [re-frame.core :as rf]))
 
 (declare save)
