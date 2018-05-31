@@ -1,12 +1,12 @@
 (ns stand-lib.utils.forms
   (:require
    [re-frame.core :as rf]
-   [stand-lib.utils :refer [keyword-or-int]]))
+   [stand-lib.utils :refer [num-or-str]]))
 
 (defn get-value [event]
   (-> event .-target .-value))
 
-(defn swap-val-at! [path v]
+(defn reset-val-at! [path v]
   (rf/dispatch [:set-state path v])
   v)
 
@@ -18,10 +18,10 @@
     (rf/dispatch [:set-state path (when-not (js/isNaN n) n)])))
 
 (defn handle-opt-change-at [path e]
-  (rf/dispatch [:set-state path (keyword-or-int (get-value e))]))
+  (rf/dispatch [:set-state path (num-or-str (get-value e))]))
 
 (defn handle-mopt-change-at [path e]
-  (let [val (keyword-or-int (get-value e))
+  (let [val (num-or-str (get-value e))
         f (fn [acc]
               (cond
                 (nil? acc) #{val}

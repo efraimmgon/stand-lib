@@ -29,6 +29,12 @@
     (js/parseInt x)
     (keyword x)))
 
+(defn num-or-str [x]
+  (let [parsed (js/parseFloat x)]
+    (if (js/isNaN parsed)
+      x
+      parsed)))
+    
 (defn extract-ns+name [k]
   (mapv keyword-or-int
         (if (qualified-keyword? k)

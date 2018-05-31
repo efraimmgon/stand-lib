@@ -2,7 +2,7 @@
   (:require
    [re-frame.core :as rf]
    [stand-lib.re-frame.utils :refer [query]]
-   [stand-lib.utils :refer [extract-ns+name keyword-or-int make-keys]]))
+   [stand-lib.utils :refer [extract-ns+name make-keys]]))
 
 (defn query-sub [db [event ns+name]]
   (get-in db (make-keys ns+name)))

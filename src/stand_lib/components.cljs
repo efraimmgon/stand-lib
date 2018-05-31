@@ -3,7 +3,8 @@
    [clojure.string :as string]
    [reagent.core :as r :refer [atom]]
    [re-frame.core :as rf]
-   [stand-lib.handlers]))
+   [stand-lib.handlers]
+   [cljs.pprint]))
 
 ; ------------------------------------------------------------------------------
 ; Debugging
@@ -119,7 +120,7 @@
    [:tr
     (for [th headers]
       ^{:key th}
-      [:th th])]])
+      [:th (str th)])]])
 
 (defn tbody [rows]
   (into
@@ -128,7 +129,7 @@
      (into
       [:tr]
       (for [td row]
-        [:td td])))))
+        [:td (str td)])))))
 
 (defn thead-indexed
   "Coupled with `tbody-indexed`, allocates a col for the row's index."
@@ -160,9 +161,9 @@
   `ks` are the a the set of keys from rows we want displayed.
   `class` is css class to be aplied to the `table` element."
   ([ks rows] (tabulate ks rows {}))
-  ([ks rows {:keys [class]}]
+  ([attrs ks rows]
    [:table
-    {:class class}
+    attrs
     ;; if there are extra headers we append them
     [thead (map (comp (fn [s] (string/replace s #"-" " "))
                       string/capitalize

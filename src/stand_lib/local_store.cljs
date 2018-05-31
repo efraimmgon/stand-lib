@@ -85,18 +85,25 @@
        (remove where)
        (save! from)))
 
+(defn order-by-fn [params coll]
+  (if params
+    (let [[keyfn comp] params]
+      (sort-by keyfn comp coll))
+    coll))
 
 (defn select
   "Takes a map with two keys: `from` and `where`. The former is the coll
   where selecting, the latter is a test function. If `(where item)` is true
   we return `item`."
-  [{:keys [from where]}]
-  (cond
-    (coll? from) (filter where from)
-    ;; if `from` is the ls-key we load it
-    ;; if where is not given we return everything
-    (nil? where)
-    (load from)
-    ;; otherwise we filter it
-    :else (->> (load from)
-               (filter where))))
+  [{:keys [from where order-by]}]
+  (let [result
+        (cond
+          (coll? from) (filter where from)
+          ;; if `from` is the ls-key we load it
+          ;; if where is not given we return everything
+          (nil? where)
+          (load from)
+          ;; otherwise we filter it
+          :else (->> (load from)
+                     (filter where)))]
+    (order-by-fn order-by result)))
