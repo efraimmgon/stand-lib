@@ -5,18 +5,22 @@
    [stand-lib.utils :refer [num-or-str]]))
 
 ; It seems the best course of action is to stop fighting your host language
-; at every corner. Instead, well work with it the best we can and we'll
-; simply coerce things to our way at the fringes and let the core work with
-; the same inconsistencies as the host.
+; at every corner. Instead, we'll work with it the best we can and
+; simply coerce types at the fringes and let the core work with js's
+; inconsistencies.
 
-; What this means? The core form components will store everything as a string
+; What does this means? We will store everything as strings
 ; and the coercions will be done by the user, at the point he thinks best.
 
 ; This will suck for things like checkbox and select inputs, I suppose. Will
-; it make it unfeasable or unsuferable, though?
+; it make it unfeasable or unsuferable, though? Time will tell.
 
 ; - Radio and select inputs can have a single value mapped to their name attr.
 ; - Checkbox inputs can have one or more values mapped to its name attr.
+
+; ------------------------------------------------------------------------------
+; Helpers' helpers
+; ------------------------------------------------------------------------------
 
 (defn target-value [event]
   (.-value (.-target event)))
@@ -24,6 +28,10 @@
 (defn set-state! [path v]
   (rf/dispatch [:set-state path v])
   v)
+
+; ------------------------------------------------------------------------------
+; Core
+; ------------------------------------------------------------------------------
 
 (defn handle-change-at [path e]
   (set-state! path (target-value e)))
