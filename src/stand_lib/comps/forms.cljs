@@ -36,7 +36,7 @@
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (update :value #(or % @stored-val)))]
+            (assoc :value @stored-val))]
     [:input edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -87,7 +87,7 @@
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (update :value #(or % @stored-val)))]
+            (assoc :value @stored-val))]
     [:textarea edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -101,7 +101,7 @@
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (update :value #(or % (or @stored-val (:default-value attrs))))
+            (update :value #(or @stored-val (:default-value attrs)))
             (dissoc :default-value))]
     (when (and (nil? @stored-val) (:default-value attrs))
       (set-state! (:name attrs) (:default-value attrs)))
