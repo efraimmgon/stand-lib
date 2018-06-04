@@ -13,6 +13,17 @@
 ; uses, they are able to provide custom values to some methods.
 ; In all cases, they can provide a custom `on-change` fn. Other custom values
 ; can be provided, as it makes sense for each input type.
+; As we see it, users might want to handle the value the user inputs, or
+; the value that is displayed to users, as they input it.
+; Suppose we want to store the text users type as all caps, and display
+; the text as all lower case. For that end we have only to customize
+; the `on-change` and `value` keys:
+; [input {:type :text
+;         :name :users.user/name
+;         :on-change
+;         (fn [e] (set-state! :users.user/name (upper-case (target-value e))))}]
+;         :value
+;         (upper-case @(rf/subscribe [:query :users.user/name]))}]
 
 ; Given our implementation choice, the `:name` field must refer to a
 ; `re_frame.db.app_db.state` location.
@@ -36,7 +47,7 @@
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (assoc :value @stored-val))]
+            (update :value #(or % @stored-val)))]
     [:input edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -87,7 +98,7 @@
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (handle-change-at (:name attrs) e))))
-            (assoc :value @stored-val))]
+            (update :value #(constantly @stored-val)))]
     [:textarea edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
