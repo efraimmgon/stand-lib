@@ -33,13 +33,13 @@
 ; Core
 ; ------------------------------------------------------------------------------
 
-(defn handle-change-at [path e]
+(defn handle-change-at! [path e]
   (set-state! path (target-value e)))
 
-(defn set-value-at [path e]
+(defn set-value-at! [path e]
   (rf/dispatch [:set-state path (target-value e)]))
 
-(defn toggle-value-at [path]
+(defn toggle-value! [path]
   (let [update-fn not]
     (rf/dispatch [:update-state path update-fn])))
 

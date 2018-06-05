@@ -2,7 +2,7 @@
   (:require
    [re-frame.core :as rf]
    [stand-lib.utils.forms :refer
-    [handle-mopt-change-at set-state! set-value-at toggle-value-at]]))
+    [handle-mopt-change-at set-state! set-value-at! toggle-value!]]))
 
 ; I have started this project after not being satisfied with the available
 ; projects. Also, following Lisp's philosiphy, I just wanted to hack something
@@ -57,19 +57,25 @@
 ;         :required true}]
 (defmulti input :type)
 
+; `:default-value` will display the value at the input field and persist it
+; at the location provided in `:name`
 ; Inputs of type:
 ; - `text`
 ; - `number`
 ; refer to it.
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`.
+; Available fields: `:value`, `:default-value`.
 (defmethod input :default
   [attrs]
   (let [stored-val (rf/subscribe [:query (:name attrs)])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (set-value-at (:name attrs) e))))
-            (update :value #(or % @stored-val)))]
+            (update :on-change #(or % (fn [e] (set-value-at! (:name attrs) e))))
+            (update :value #(or % @stored-val))
+            (dissoc :default-value))]
+    (when (not @stored-val)
+      (when-let [val (:default-value attrs)]
+        (set-state! (:name attrs) val)))
     [:input edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -83,7 +89,7 @@
         edited-attrs
         (-> attrs
             (assoc :type :radio)
-            (update :on-change #(or % (fn [e] (set-value-at (:name attrs) e))))
+            (update :on-change #(or % (fn [e] (set-value-at! (:name attrs) e))))
             (update :checked #(or % (or (:default-checked attrs)
                                         (= svalue @stored-val))))
             (dissoc :default-checked))]
@@ -106,24 +112,31 @@
         edited-attrs
         (-> attrs
             (assoc :type :checkbox)
-            (update :on-change #(or % (fn [e] (toggle-value-at input-name))))
+            (update :on-change #(or % (fn [e] (toggle-value! input-name))))
             (update :on-change #(or % (fn [e] (rf/dispatch [:update-state input-name handle-input-change]))))
             (assoc :checked (or (:default-checked attrs) @checked?))
             (dissoc :default-checked))]
     ;; Persist value when it's default-checked:
     (when (and (:checked edited-attrs)
                (not checked?))
-      (toggle-value-at input-name))
+      (toggle-value! input-name))
     [:input edited-attrs]))
 
+; `:default-value` will display the value at the input field and persist it
+; at the location provided in `:name`
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`.
+; Available fields: `:value`, `:default-value`.
 (defn textarea [attrs]
   (let [stored-val (rf/subscribe [:query (:name attrs)])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (set-value-at (:name attrs) e))))
-            (update :value #(or % @stored-val)))]
+            (update :on-change #(or % (fn [e] (set-value-at! (:name attrs) e))))
+            (update :value #(or % @stored-val))
+            (dissoc :default-value))]
+    ;; Persist default-value:
+    (when (not @stored-val)
+      (when-let [val (:default-value attrs)]
+        (set-state! (:name attrs) val)))
     [:textarea edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -134,7 +147,7 @@
 ; options, otherwise, it will be the option's value (string).
 (defn select [attrs options]
   (let [stored-val (rf/subscribe [:query (:name attrs)])
-        on-change (if (:multiple attrs) handle-mopt-change-at set-value-at)
+        on-change (if (:multiple attrs) handle-mopt-change-at set-value-at!)
         edited-attrs
         (-> attrs
             (update :on-change #(or % (fn [e] (on-change (:name attrs) e))))
