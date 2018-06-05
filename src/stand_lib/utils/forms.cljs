@@ -36,6 +36,13 @@
 (defn handle-change-at [path e]
   (set-state! path (target-value e)))
 
+(defn set-value-at [path e]
+  (rf/dispatch [:set-state path (target-value e)]))
+
+(defn toggle-value-at [path]
+  (let [update-fn not]
+    (rf/dispatch [:update-state path update-fn])))
+
 (defn handle-mopt-change-at
   "For checkboxes, for instance, maps `path` to a set, handling insertion and
   removal of values as per user interaction."
