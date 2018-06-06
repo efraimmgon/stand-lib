@@ -67,15 +67,17 @@
 ; Available fields: `:value`, `:default-value`.
 (defmethod input :default
   [attrs]
-  (let [stored-val (rf/subscribe [:query (:name attrs)])
+  (let [{:keys [default-value name]} attrs
+        stored-val (rf/subscribe [:query name])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (set-value-at! (:name attrs) e))))
+            (update :on-change #(or % (fn [e] (set-value-at! name e))))
             (update :value #(or % @stored-val))
             (dissoc :default-value))]
+    ;; Persist value when it's the default:
     (when (not @stored-val)
-      (when-let [val (:default-value attrs)]
-        (set-state! (:name attrs) val)))
+      (when-let [val default-value]
+        (set-state! name val)))
     [:input edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -84,18 +86,19 @@
 ; `stored-val` will be a string of :value
 (defmethod input :radio
   [attrs]
-  (let [stored-val (rf/subscribe [:query (:name attrs)])
-        svalue (str (:value attrs))
+  (let [{:keys [default-checked name value]} attrs
+        stored-val (rf/subscribe [:query name])
+        svalue (str value)
         edited-attrs
         (-> attrs
             (assoc :type :radio)
-            (update :on-change #(or % (fn [e] (set-value-at! (:name attrs) e))))
-            (update :checked #(or % (or (:default-checked attrs)
+            (update :on-change #(or % (fn [e] (set-value-at! name e))))
+            (update :checked #(or % (or default-checked
                                         (= svalue @stored-val))))
             (dissoc :default-checked))]
     ;; Persist value when it's the default:
     (when (and (not @stored-val) (:checked edited-attrs))
-      (set-state! (:name edited-attrs) svalue))
+      (set-state! name svalue))
     [:input edited-attrs]))
 
 ; Like the others input components, the value is mapped to the location of the
@@ -106,20 +109,19 @@
 ; The `checked` field, is reserved for the inner implementation.
 (defmethod input :checkbox
   [attrs]
-  (let [input-name (:name attrs)
+  (let [{:keys [default-checked name]} attrs
         handle-input-change not
-        checked? (rf/subscribe [:query input-name])
+        checked? (rf/subscribe [:query name])
         edited-attrs
         (-> attrs
             (assoc :type :checkbox)
-            (update :on-change #(or % (fn [e] (toggle-value! input-name))))
-            (update :on-change #(or % (fn [e] (rf/dispatch [:update-state input-name handle-input-change]))))
-            (assoc :checked (or (:default-checked attrs) @checked?))
+            (update :on-change #(or % (fn [e] (toggle-value! name))))
+            (assoc :checked (or default-checked @checked?))
             (dissoc :default-checked))]
     ;; Persist value when it's default-checked:
     (when (and (:checked edited-attrs)
                (not checked?))
-      (toggle-value! input-name))
+      (toggle-value! name))
     [:input edited-attrs]))
 
 ; `:default-value` will display the value at the input field and persist it
@@ -127,16 +129,17 @@
 ; Required keys: `:name`, `:on-change`.
 ; Available fields: `:value`, `:default-value`.
 (defn textarea [attrs]
-  (let [stored-val (rf/subscribe [:query (:name attrs)])
+  (let [{:keys [default-value name]} attrs
+        stored-val (rf/subscribe [:query name])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (set-value-at! (:name attrs) e))))
+            (update :on-change #(or % (fn [e] (set-value-at! name e))))
             (update :value #(or % @stored-val))
             (dissoc :default-value))]
     ;; Persist default-value:
     (when (not @stored-val)
-      (when-let [val (:default-value attrs)]
-        (set-state! (:name attrs) val)))
+      (when-let [val default-value]
+        (set-state! name val)))
     [:textarea edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
@@ -146,14 +149,19 @@
 ; NOTE: If :multiple is `true`, `stored-val` will be a set of the selected
 ; options, otherwise, it will be the option's value (string).
 (defn select [attrs options]
-  (let [stored-val (rf/subscribe [:query (:name attrs)])
-        on-change (if (:multiple attrs) handle-mopt-change-at set-value-at!)
+  (let [{:keys [default-value multiple name]} attrs
+        stored-val (rf/subscribe [:query name])
+        on-change (if multiple handle-mopt-change-at set-value-at!)
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (on-change (:name attrs) e))))
-            (update :value #(or @stored-val (:default-value attrs)))
+            (update :on-change #(or % (fn [e] (on-change name e))))
+            (update :value #(or @stored-val default-value))
             (dissoc :default-value))]
-    (when (and (nil? @stored-val) (:default-value attrs))
-      (on-change (:name attrs) (:default-value attrs)))
+    ;; Persist value when it's the default:
+    (when (and (not @stored-val) default-value)
+        (set-state! name
+                    (if multiple
+                      #{default-value}
+                      default-value)))
     [:select edited-attrs
      options]))
