@@ -46,9 +46,8 @@
 (defn handle-mopt-change-at
   "For checkboxes, for instance, maps `path` to a set, handling insertion and
   removal of values as per user interaction."
-  [path e]
-  (let [val (target-value e)
-        update-f (fn [a-set]
+  [path val]
+  (let [update-f (fn [a-set]
                    (cond
                      (nil? a-set) #{val}
                      (contains? a-set val) (disj a-set val)
