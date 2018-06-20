@@ -1,5 +1,6 @@
 (ns stand-lib.comps.forms
   (:require
+   [cljs.reader :as reader]
    [re-frame.core :as rf]
    [stand-lib.utils.forms :refer
     [handle-mopt-change-at set-state! toggle-value! target-value]]))
@@ -21,7 +22,7 @@
 ; inputs with JavaScript.
 
 ; One downside of our library is that there is no type coercion. This will
-; affect the :number, :checkbo and :radio inputs  and the `select` component.
+; affect the :number, :checkbox and :radio inputs  and the `select` component.
 ; This happens because we leverege js to retrieve the value (e.target.value)
 ; The main reason for this choice was to keep the implementation simple.
 ; On a positive note, these types are easy to coerce before submitting them
@@ -66,71 +67,103 @@
 ; While not completely certain about this choice, at this time it seems the
 ; best approach.
 
+(defn- read-target-value [event coerce?]
+  (let [sval (target-value event)]
+    (if coerce?
+      (reader/read-string sval)
+      sval)))
+
+(defn- clean-attrs [attrs]
+  (dissoc attrs :default-value :default-checked :coerce?))
+
 ; `:default-value` will display the value at the input field and persist it
 ; at the location provided in `:name`
 ; Inputs of type:
 ; - `text`
-; - `number`
 ; refer to it.
 ; Required keys: `:name`, `:on-change`.
 ; Available fields: `:value`, `:default-value`.
 (defmethod input :default
   [attrs]
-  (let [{:keys [default-value name]} attrs
+  (let [{:keys [default-value name coerce?],
+         :or {coerce? false}} attrs
         stored-val (rf/subscribe [:query name])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (set-state! name (target-value e)))))
+            (update :on-change #(or % (fn [e] (set-state! name (read-target-value e coerce?)))))
             ;; Reason for `""`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
             (update :value #(or % @stored-val ""))
-            (dissoc :default-value))]
+            clean-attrs)]
+    (when (and (not @stored-val) default-value)
+      (set-state! name default-value))
+    [:input edited-attrs]))
+
+; `:default-value` will display the value at the input field and persist it
+; at the location provided in `:name`
+; Required keys: `:name`, `:on-change`.
+; Available fields: `:value`, `:default-value`.
+(defmethod input :number
+  [attrs]
+  (let [{:keys [default-value name coerce?],
+         :or {coerce? true}} attrs
+        stored-val (rf/subscribe [:query name])
+        edited-attrs
+        (-> attrs
+            (update :on-change #(or % (fn [e] (set-state! name (read-target-value e coerce?)))))
+            ;; Reason for empty string: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
+            (update :value #(or % @stored-val ""))
+            clean-attrs)]
     ;; Persist value when it's the default:
     (when (and (not @stored-val) default-value)
       (set-state! name default-value))
     [:input edited-attrs]))
 
+
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `default-checked`.
-; The `checked` field, is reserved for the inner implementation.
-; `stored-val` will be a string of :value
+; Available fields: `:value`, `:checked`, `:default-checked`.
+; The `checked` field is reserved for the inner implementation.
 (defmethod input :radio
   [attrs]
-  (let [{:keys [default-checked name value]} attrs
+  (let [{:keys [default-checked name value coerce?],
+         :or {coerce? true}} attrs
         stored-val (rf/subscribe [:query name])
-        svalue (str value)
+        value (if coerce? value (str value))
         edited-attrs
         (-> attrs
-            (assoc :type :radio)
-            (update :on-change #(or % (fn [e] (set-state! name (target-value e)))))
+            (update :on-change #(or % (fn [e] (set-state! name (read-target-value e coerce?)))))
             ;; Reason for `false`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
-            (update :checked #(or % (= svalue @stored-val) (boolean default-checked) false))
-            (dissoc :default-checked))]
+            (update :checked #(or % (= value @stored-val)))
+            ;(update :checked #(or % (= value @stored-val) (boolean default-checked) false))
+            clean-attrs)]
     ;; Persist value when it's the default:
-    (when (and (not @stored-val) (:checked edited-attrs))
-      (set-state! name svalue))
+    (when (and (not @stored-val) default-checked)
+      (set-state! name value))
+    ; (when (and (not @stored-val) (:checked edited-attrs))
+    ;   (set-state! name value))
     [:input edited-attrs]))
 
-; Like the others input components, the value is mapped to the location of the
+; Like the other input components, the value is mapped to the location of the
 ; :name attr but the value assoced with it will only be either `true`
-; or (logical) `false`.
+; or `false`.
 ; Required keys: `:name`, `:on-change`.
 ; Available fields: `:value`, `default-checked`.
 ; The `checked` field, is reserved for the inner implementation.
 (defmethod input :checkbox
   [attrs]
   (let [{:keys [default-checked name]} attrs
-        handle-input-change not
         stored-val (rf/subscribe [:query name])
         edited-attrs
         (-> attrs
-            (assoc :type :checkbox)
             (update :on-change #(or % (fn [e] (toggle-value! name))))
             ;; Reason for `false`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
-            (update :checked #(or % @stored-val default-checked false))
-            (dissoc :default-checked))]
+            (update :checked #(or % @stored-val false))
+            ;(update :checked #(or % @stored-val default-checked false))
+            clean-attrs)]
     ;; Persist value when it's default-checked:
-    (when (and (:checked edited-attrs) (not @stored-val))
+    (when (and (nil? @stored-val) default-checked)
       (toggle-value! name))
+    ; (when (and (:checked edited-attrs) (not @stored-val))
+    ;   (toggle-value! name))
     [:input edited-attrs]))
 
 ; `:default-value` will display the value at the input field and persist it
@@ -138,14 +171,15 @@
 ; Required keys: `:name`, `:on-change`.
 ; Available fields: `:value`, `:default-value`.
 (defn textarea [attrs]
-  (let [{:keys [default-value name]} attrs
+  (let [{:keys [default-value name coerce?]
+         :or {coerce? false}} attrs
         stored-val (rf/subscribe [:query name])
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (set-state! name (target-value e)))))
-            ;; Reason for `""`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
+            (update :on-change #(or % (fn [e] (set-state! name (read-target-value e coerce?)))))
+            ;; Reason for empty string: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
             (update :value #(or % @stored-val ""))
-            (dissoc :default-value))]
+            clean-attrs)]
     ;; Persist default-value:
     (when (and (not @stored-val) default-value)
       (set-state! name default-value))
@@ -156,17 +190,19 @@
 ; `sotred-val` will be a string of :value
 ; NOTE: As per React, `:default-value` replaces the `selected` property.
 ; NOTE: If :multiple is `true`, `stored-val` will be a set of the selected
-; options, otherwise, it will be the option's value (string).
+; options, otherwise, it will be the option's value (string, if :coerce? is false).
 (defn select [attrs options]
-  (let [{:keys [default-value multiple name]} attrs
+  (let [{:keys [default-value multiple name coerce?]
+         :or {coerce? true}} attrs
         stored-val (rf/subscribe [:query name])
         on-change (if multiple handle-mopt-change-at set-state!)
         edited-attrs
         (-> attrs
-            (update :on-change #(or % (fn [e] (on-change name (target-value e)))))
-            ;; Reason for `""`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
-            (update :value #(or @stored-val default-value ""))
-            (dissoc :default-value))]
+            (update :on-change #(or % (fn [e] (on-change name (read-target-value e coerce?)))))
+            ;; Reason for empty string: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
+            (update :value #(or % @stored-val ""))
+            ;(update :value #(or @stored-val default-value ""))
+            clean-attrs)]
     ;; Persist value when it's the default:
     (when (and (not @stored-val) default-value)
         (set-state! name
