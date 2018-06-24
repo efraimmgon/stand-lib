@@ -14,19 +14,17 @@
 ; (https://github.com/reagent-project/reagent-forms) and free-form
 ; (https://github.com/pupeno/free-form).
 ; The one thing I disliked about both of them is that one must learn yet
-; another domain specific language (DSL). And the thing about DSL's is that
-; they have quite the learning curve when you want to do unusual things.
-; Instead, I wanted to do what I did with HTML, but with ClojureScript.
+; another domain specific language (DSL). The thing about DSL's is that
+; they have quite a learning curve when you want to do unusual things.
+; Instead, I wanted to do what one did with HTML, but with ClojureScript.
 ; Therefore, we'll leverege as much of HTML syntax as possible, so one can
 ; use all the attributes that we were already used to when handling with
 ; inputs with JavaScript.
 
-; One downside of our library is that there is no type coercion. This will
-; affect the :number, :checkbox and :radio inputs  and the `select` component.
-; This happens because we leverege js to retrieve the value (e.target.value)
-; The main reason for this choice was to keep the implementation simple.
-; On a positive note, these types are easy to coerce before submitting them
-; to the server, and there are plenty of solutions for this problem.
+; Levereging JavaScript's capabilities, event.target.type always returns
+; a string. To work around this limitation, we're levereging
+; `cljs.reader/read-string` to read the returned string to its respective
+; Clojure type.
 
 ; Although different input types do different things, the core of the
 ; implementation revolves around the `on-change` fn.
@@ -34,7 +32,7 @@
 ; using reagent, our implementation relies heavily on it.
 
 ; With the intention of allowing users to tailor the components to their
-; uses, tcustom values can be provided to some attributes
+; uses, custom values can be provided to some attributes
 ; In all cases, a custom `on-change` fn can be provided. Other custom values
 ; can be provided, as it makes sense for each input type.
 
@@ -45,18 +43,9 @@
 ;         :name :users.user/name
 ;         :on-change
 ;         (fn [e] (set-state! :users.user/name (upper-case (target-value e))))}]
+;         :default-value "Default text."
 ;         :value
-;         (upper-case @(rf/subscribe [:query :users.user/name]))}]
-
-; Given our implementation choice, the `:name` field must refer to a
-; `re_frame.db.app_db.state` location.
-; It can be given as a keyword, `:a.db.location` or  `:a.db/location`,
-; or a vector of keywords, `[:a :db :location]`.
-; I.e:
-; [input {:name :users.user/name ; or :users.user.name or [:users :user :name]
-;         :type :text
-;         :required true}]
-(defmulti input :type)
+;         (lower-case @(rf/subscribe [:query :users.user/name]))}]
 
 ; NOTE:
 ; In React default-value and default-checked keys are meant for uncontrolled
@@ -66,6 +55,17 @@
 ; re_frame.db.app_db.state.
 ; While not completely certain about this choice, at this time it seems the
 ; best approach.
+
+; Given our implementation choice, the `:name` field must refer to a
+; `re_frame.db.app_db.state` location.
+; It can be given as a keyword, `:a.db.location` or  `:a.db/location`,
+; or a vector of keywords, `[:a :db :location]`.
+; I.e:
+; [input {:name :users.user/name ; or :users.user.name or [:users :user :name]
+;         :type :text
+;         :required true}]
+
+(defmulti input :type)
 
 (defn- read-target-value [event coerce?]
   (let [sval (target-value event)]
@@ -77,12 +77,9 @@
   (dissoc attrs :default-value :default-checked :coerce?))
 
 ; `:default-value` will display the value at the input field and persist it
-; at the location provided in `:name`
-; Inputs of type:
-; - `text`
-; refer to it.
+; at the location provided in `:name`.
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `:default-value`.
+; Available fields: `:value`, `:default-value`, `:coerce?`.
 (defmethod input :default
   [attrs]
   (let [{:keys [default-value name coerce?],
@@ -101,7 +98,7 @@
 ; `:default-value` will display the value at the input field and persist it
 ; at the location provided in `:name`
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `:default-value`.
+; Available fields: `:value`, `:default-value`, `:coerce?`.
 (defmethod input :number
   [attrs]
   (let [{:keys [default-value name coerce?],
@@ -120,8 +117,7 @@
 
 
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `:checked`, `:default-checked`.
-; The `checked` field is reserved for the inner implementation.
+; Available fields: `:value`, `:checked`, `:default-checked`, `:coerce?`.
 (defmethod input :radio
   [attrs]
   (let [{:keys [default-checked name value coerce?],
@@ -133,21 +129,17 @@
             (update :on-change #(or % (fn [e] (set-state! name (read-target-value e coerce?)))))
             ;; Reason for `false`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
             (update :checked #(or % (= value @stored-val)))
-            ;(update :checked #(or % (= value @stored-val) (boolean default-checked) false))
             clean-attrs)]
     ;; Persist value when it's the default:
     (when (and (not @stored-val) default-checked)
       (set-state! name value))
-    ; (when (and (not @stored-val) (:checked edited-attrs))
-    ;   (set-state! name value))
     [:input edited-attrs]))
 
 ; Like the other input components, the value is mapped to the location of the
 ; :name attr but the value assoced with it will only be either `true`
 ; or `false`.
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `default-checked`.
-; The `checked` field, is reserved for the inner implementation.
+; Available fields: `:value`, `:checked`, `default-checked`, `:coerce?`.
 (defmethod input :checkbox
   [attrs]
   (let [{:keys [default-checked name]} attrs
@@ -157,19 +149,16 @@
             (update :on-change #(or % (fn [e] (toggle-value! name))))
             ;; Reason for `false`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
             (update :checked #(or % @stored-val false))
-            ;(update :checked #(or % @stored-val default-checked false))
             clean-attrs)]
     ;; Persist value when it's default-checked:
     (when (and (nil? @stored-val) default-checked)
       (toggle-value! name))
-    ; (when (and (:checked edited-attrs) (not @stored-val))
-    ;   (toggle-value! name))
     [:input edited-attrs]))
 
 ; `:default-value` will display the value at the input field and persist it
-; at the location provided in `:name`
+; at the location provided in `:name`.
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `:default-value`.
+; Available fields: `:value`, `:default-value`, `:coerce?`.
 (defn textarea [attrs]
   (let [{:keys [default-value name coerce?]
          :or {coerce? false}} attrs
@@ -186,8 +175,7 @@
     [:textarea edited-attrs]))
 
 ; Required keys: `:name`, `:on-change`.
-; Available fields: `:value`, `default-value`.
-; `sotred-val` will be a string of :value
+; Available fields: `:value`, `default-value`, `:coerce?`.
 ; NOTE: As per React, `:default-value` replaces the `selected` property.
 ; NOTE: If :multiple is `true`, `stored-val` will be a set of the selected
 ; options, otherwise, it will be the option's value (string, if :coerce? is false).
@@ -201,7 +189,6 @@
             (update :on-change #(or % (fn [e] (on-change name (read-target-value e coerce?)))))
             ;; Reason for empty string: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
             (update :value #(or % @stored-val ""))
-            ;(update :value #(or @stored-val default-value ""))
             clean-attrs)]
     ;; Persist value when it's the default:
     (when (and (not @stored-val) default-value)
