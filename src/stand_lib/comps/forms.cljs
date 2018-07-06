@@ -78,6 +78,7 @@
 
 ; `:default-value` will display the value at the input field and persist it
 ; at the location provided in `:name`.
+; `:text`, `:password`
 ; Required keys: `:name`, `:on-change`.
 ; Available fields: `:value`, `:default-value`, `:coerce?`.
 (defmethod input :default
@@ -91,7 +92,7 @@
             ;; Reason for `""`: https://zhenyong.github.io/react/tips/controlled-input-null-value.html
             (update :value #(or % @stored-val ""))
             clean-attrs)]
-    (when (and (not @stored-val) default-value)
+    (when (and (nil? @stored-val) default-value)
       (set-state! name default-value))
     [:input edited-attrs]))
 
@@ -111,7 +112,7 @@
             (update :value #(or % @stored-val ""))
             clean-attrs)]
     ;; Persist value when it's the default:
-    (when (and (not @stored-val) default-value)
+    (when (and (nil? @stored-val) default-value)
       (set-state! name default-value))
     [:input edited-attrs]))
 
@@ -131,7 +132,7 @@
             (update :checked #(or % (= value @stored-val)))
             clean-attrs)]
     ;; Persist value when it's the default:
-    (when (and (not @stored-val) default-checked)
+    (when (and (nil? @stored-val) default-checked)
       (set-state! name value))
     [:input edited-attrs]))
 
@@ -170,7 +171,7 @@
             (update :value #(or % @stored-val ""))
             clean-attrs)]
     ;; Persist default-value:
-    (when (and (not @stored-val) default-value)
+    (when (and (nil? @stored-val) default-value)
       (set-state! name default-value))
     [:textarea edited-attrs]))
 
@@ -191,7 +192,7 @@
             (update :value #(or % @stored-val ""))
             clean-attrs)]
     ;; Persist value when it's the default:
-    (when (and (not @stored-val) default-value)
+    (when (and (nil? @stored-val) default-value)
         (set-state! name
                     (if multiple
                       #{default-value}
